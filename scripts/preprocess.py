@@ -16,10 +16,12 @@ def has_latin(text):
 
 
 def create_df(data, part_number, output_dir='../outputs/'):
-    column_names = ['volume', 'part', 'chapter', 'text', 'cs', 'ds']
+    column_names = ['volume', 'part', 'chapter', 'text', 'cs',
+                    'num-switches-intraturn', 'num-switches-interturn',
+                    'num-switches-intrasent']
     df = pd.DataFrame(data, columns=column_names)
     if output_dir:
-        df.to_csv(f'{output_dir}part_{part_number}.csv', encoding='utf-8')
+        df.to_csv(f'{output_dir}cs_{part_number}.csv', encoding='utf-8')
 
 
 def parse_file(path):
@@ -46,18 +48,38 @@ def parse_file(path):
                 chapter_number = j
                 lines = c.split('\n\n')
                 for l in lines:
-                    tokens, ds, cs, speaker, letter = parse_line(l, speaker=speaker, letter=letter)
-                    data.append([volume_number, part_number, chapter_number,
-                                 tokens, cs, ds])
+                    tokens, cs, num_intrasent = parse_line(l)#, speaker=speaker, letter=letter)
+                    # include CS instances only
+                    if 'non-ru' in cs:
+                        num_intra_turn_switches = 0
+                        num_inter_turn_switches = 0
+                        lang = ''
+                        for s in cs:
+                            if not s:  # empty string, punctuation or other
+                                continue
+                            if s != lang:
+                                if not lang == '':
+                                    num_intra_turn_switches += 1
+                                lang = s
+                        if num_intra_turn_switches == 0:
+                            num_inter_turn_switches = 1
+                        data.append([volume_number, part_number, chapter_number,
+                                    tokens, cs, num_intra_turn_switches,
+                                    num_inter_turn_switches, num_intrasent])
     create_df(data, volume_number)
     return data
 
 
-def parse_line(l, speaker=False, letter=False, nlp=nlp_mul):
-    tokens, ds, cs = [], [], []
-    # simple white space tokenization?
+def parse_line(l, nlp=nlp_mul):
+    tokens, cs = [], []
+    # remove footnote markers, e.g. [8]
+    l = re.sub(r"\[\d+\]", "", l)
     parsed = nlp(l)
+    num_intrasent = 0
     for sent in parsed.sents:
+        sent_txt = ' '.join([token.text for token in sent])
+        if has_cyrillic(sent_txt) and has_latin(sent_txt):
+            num_intrasent += 1
         for token in sent:
             tokens.append(token.text)
             if has_cyrillic(token.text):
@@ -69,63 +91,15 @@ def parse_line(l, speaker=False, letter=False, nlp=nlp_mul):
                 cs.append('')
 
     no_tokens = len(tokens)
-    # detect direct speech
-    if '—' in tokens and (not ' — ' in l or ', — ' in l):  # ignore hyphen for emphasis
-        switches = tokens.count('—')
-        if switches == 1 and l.startswith('— '):
-            # turn is direct speech only
-            ds = ['—'] + [1 for i in range(no_tokens - 1)]
-        else:
-            # bool to keep track
-            speaker = False
-            # iterate tokens
-            for i, t in enumerate(tokens):
-                if t == '—' and (i == 0 or tokens[i-1] == ','):
-                    ds.append('—')
-                    # change bool
-                    speaker = not speaker
-                else:
-                    if speaker:  # speaker
-                        ds.append(1)
-                    else:  # narrator
-                        ds.append(0)
+    
+    return tokens, cs, num_intrasent
 
-    if '«' in l:
-        # start of a letter / written correspondence
-        # OR singing
-        # whole line correspondence
-        if l.startswith('«') and (l.endswith('»') or '»' not in l):
-            ds = ['«'] + [2 for i in range(no_tokens - 1)]
-            if '»' in l:
-                letter = False
-            else:
-                # letter continues in next line
-                letter = True
-        # switch to narrator
-        elif '»,' in l:
-            letter = False
-            for t in tokens:
-                if t == '«':
-                    ds.append('«')
-                    letter = True
-                elif t == '»':
-                    ds.append('»')
-                    letter = False
-                else:
-                    if letter:
-                        ds.append(2)
-                    else:
-                        ds.append(0)
-    # narrator voice only
-    if not ds:
-    # any(x in l for x in {'—','«', '»'}) and not speaker and not letter:
-        ds = [0 for i in range(no_tokens)]
 
-    # detect direct speech
-    if not len(tokens) == len(ds) == len(cs):
-        print(l)
-    return tokens, ds, cs, speaker, letter
-
+def detect_direct_speech(tokens):
+    ds = []
+    if tokens[0] == '«':
+        pass
+    return ds
 
 
 def tokenize(line):
@@ -138,4 +112,3 @@ if __name__ == '__main__':
     for f in sorted(os.listdir(corpus_dir)):
         print(f)
         parse_file(corpus_dir+f)
-        break
