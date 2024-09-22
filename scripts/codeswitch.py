@@ -1,3 +1,4 @@
+import os
 import re
 
 import pandas as pd
@@ -22,4 +23,11 @@ def process_snippet(tokens, lang):
         doc = nlp_ru(text)
     elif lang == 'fr':
         doc = nlp_fr(text)
+    # PoS, NER
+    pos, lemma, dep, morph = [] * 4
+    for token in doc:
+        pos.append(token.pos_)
+        lemma.append(token.lemma_)
+        dep.append(token.dep_)
+        morph.append(token.morph)
 
