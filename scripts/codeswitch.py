@@ -17,7 +17,27 @@ def process_cs(corpus, output='outputs/cs_.csv'):
             pass
         new_line = [line.index]
 
+
+def process_line(line):
+    data = []
+    for i in line.len_sents:
+        # iterate sentences, parse multilingual parts
+        current_lang = ''
+        snippet = []
+        for token, cs in zip(line.text, line.cs):
+            if cs == '':
+                snippet.appen(token)
+                continue
+            if current_lang != cs:  # snippet finalized
+                data.append(process_snippet(snippet, current_lang))
+                snippet = []
+                current_lang = cs
+            snippet.append(token)
+    return data
+
+
 def process_snippet(tokens, lang):
+    """extract linguistic information from a CS snippet"""
     text = ' '.join(tokens)
     if lang == 'ru':
         doc = nlp_ru(text)
@@ -30,4 +50,11 @@ def process_snippet(tokens, lang):
         lemma.append(token.lemma_)
         dep.append(token.dep_)
         morph.append(token.morph)
+    switch_len = len(tokens)
+    return switch_len, pos, lemma, dep, morph
 
+
+if __name__ == '__main__':
+    output_dir = '../outputs/'
+    for f in sorted(os.listdir(output_dir)):
+        df = pd.read_csv(output_dir+f)
