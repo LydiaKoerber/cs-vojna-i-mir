@@ -88,11 +88,12 @@ def process_snippet(tokens, lang):
     # PoS, lemmata, dependency and morphologic information
     pos, lemma, dep, morph = [], [], [], []
     for token in doc:
-        pos.append(token.pos_)
-        lemma.append(token.lemma_)
-        dep.append(token.dep_)
-        morph.append(token.morph)
-    switch_len = len(tokens)
+        if not token.pos_ == 'PUNCT':
+            pos.append(token.pos_)
+            lemma.append(token.lemma_)
+            dep.append(token.dep_)
+            morph.append(token.morph)
+    switch_len = len(pos)
     return tokens, switch_len, pos, lemma, dep, morph, lang
 
 
