@@ -33,8 +33,8 @@ def parse_file(path):
         text = text.split('↑ ')[0]
         # split by parts and chapters
         parts = re.split(r'ЧАСТЬ \w+Я\.\n', text)[1:]
-        chapters = []
         for i, p in enumerate(parts):
+            p = re.sub(r"————", "", p)
             if p.strip() == "": 
                 continue
             part_number = i + 1
@@ -45,17 +45,17 @@ def parse_file(path):
                 chapter_number = j + 1
                 lines = c.split('\n\n')
                 for i, l in enumerate(lines):
-                    num_interturn = 0
-                    sents, num_sent, num_intersent = parse_sents(l.strip())
+                    sents, num_sent = parse_sents(l.strip())
                     # tokens, cs, num_intrasent, num_intraword, num_sent, len_sents, len_cs_fr, len_cs_ru, no_tokens = parse_line(l)
                     # include CS instances only
                     for j, sent in enumerate(sents):
-                        tokens, cs, cs_indices, maj_lang, len_sent, first_lang, last_lang, num_intrasent = sent
+                        num_interturn = 0
+                        tokens, cs, cs_indices, maj_lang, len_sent, first_lang, last_lang, num_intrasent, num_intersent = sent
                         if j == 0 and data:
                             # check last language of previous turn to detect
                             # inter-turn switches
-                            if data[-1][-1] != first_lang:
-                                num_interturn += 1
+                            if data[-1][-2] != first_lang:
+                                num_interturn = 1
                         if first_lang == last_lang and num_intrasent > 1:
                             embedded = True
                         else:
@@ -84,7 +84,7 @@ def parse_sents(s, nlp=nlp_mul):
             if has_cyrillic(token.text):
                 cs.append('ru')
             # TODO actual lang detect
-            elif has_latin(token.text):
+            elif has_latin(token.text) and len(token.text) > 1:
                 cs.append('non-ru')
             else:
                 cs.append('')
@@ -109,11 +109,13 @@ def parse_sents(s, nlp=nlp_mul):
         last_lang = next((item for item in reversed(cs) if item != ''), None)
         if sents:
             # check for intersentential switch, last language of previous sent
-            if first_lang != sents[-1][-2]:
-                num_intersent += 1
-        sents.append([tokens, cs, cs_indices, maj_lang, len_sent, first_lang, last_lang, num_intrasent])
+            if first_lang != sents[-1][-3]:
+                num_intersent = 1
+            else:
+                num_intersent = 0
+        sents.append([tokens, cs, cs_indices, maj_lang, len_sent, first_lang, last_lang, num_intrasent, num_intersent])
         tokens, cs, cs_indices = [], [], []
-    return sents, num_sent, num_intersent
+    return sents, num_sent
 
    
 # TODO cs instanzen nach länge auszählen und dann POS/DEP kombis vergleichen
